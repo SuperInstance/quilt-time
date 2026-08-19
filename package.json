@@ -1,0 +1,21 @@
+{
+  "name": "quilt-time",
+  "version": "0.1.0",
+  "description": "Time travel for Quilt cells. Every cell has history; you can fork, rewind, replay, and merge.",
+  "main": "src/index.js",
+  "type": "module",
+  "scripts": {
+    "test": "node test/test.js"
+  },
+  "keywords": [
+    "quilt",
+    "time-travel",
+    "reactive",
+    "cells",
+    "crdt",
+    "history",
+    "branching",
+    "merging"
+  ],
+  "license": "MIT"
+}
