@@ -1,169 +1,241 @@
-# quilt-time
+# ⏱ quilt-time
 
-> Time travel for Quilt cells. Every cell has history; you can fork, rewind, replay, and merge.
+> **Every cell has a past. Fork, rewind, replay, merge.**
 
-A standalone TypeScript library. No dependencies. Drop it in, give your cells a past.
+Time travel for Quilt cells. A standalone TypeScript library. No dependencies. Drop it in, give your cells a past.
 
-## The thesis
+[![License](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Tests](https://img.shields.io/badge/tests-17%2F17-brightgreen)]()
+[![Size](https://img.shields.io/badge/size-~3KB-green)]()
+[![Try it](https://img.shields.io/badge/try-live-7ec699)](https://superinstance.github.io/quilt/landing/quilt-time.html)
 
-Quilt today is a reactive runtime. Quilt with time travel is a **database** that you can also run programs in. Every cell has versions. You can:
+**[→ Try it live in your browser](https://superinstance.github.io/quilt/landing/quilt-time.html)** — interactive timeline demo, no install.
 
-- get the current value of a cell
-- get the value as of any past time
-- see the diff between two times
-- **fork** the engine (like `git branch`)
-- **rewind** to a fork
-- **replay** events forward from a fork
-- **merge** two forks together
+---
 
-Without time travel, Quilt is "a runtime." With time travel, Quilt is "a database + a runtime + a version control system for your data." The combination is the new thing.
+## ⚡ See it in 30 seconds
 
-## Install
-
-```bash
-npm install quilt-time
-```
-
-Or just copy `src/index.js` — there are no dependencies.
-
-## Use
-
-```js
+```typescript
 import { QuiltTime } from 'quilt-time';
 
 const q = new QuiltTime();
 
-q.set('user.alice.score', 100);   // t=1
-q.set('user.alice.score', 250);   // t=2
-q.set('user.alice.score', 175);   // t=3
+q.set('counter', 0);   // t=1
+q.set('counter', 1);   // t=2
+q.set('counter', 2);   // t=3
 
-// Current value:
-q.get('user.alice.score');   // → 175
+q.get('counter');     // → 2 (current)
+q.at('counter', 1);   // → 0 (at t=1)
+q.at('counter', 2);   // → 1 (at t=2)
 
-// Value at any past time:
-q.at('user.alice.score', 1);  // → 100
-q.at('user.alice.score', 2);  // → 250
-q.at('user.alice.score', 3);  // → 175
-
-// Full history:
-q.history('user.alice.score');
-// → [
-//     { value: 100, t: 1, author: 'local' },
-//     { value: 250, t: 2, author: 'local' },
-//     { value: 175, t: 3, author: 'local' },
-//   ]
-
-// Fork: like git branch.
-const v1 = q.fork('experiment-A');
-q.set('user.alice.score', 999);   // t=4 — only on the v1 branch
-q.set('user.alice.score', 0);     // t=5 — diverged
-
-// Rewind: go back to v1.
-q.rewind(v1);
-q.get('user.alice.score');  // → 175 (the v1 value)
-
-// Replay: walk forward from a fork.
-q.set('user.alice.score', 500);   // t=6 — new history on top of v1
-q.set('user.alice.score', 600);   // t=7
-for (const e of q.replay(v1)) {
-  console.log(e.cid, e.value, e.t);
-}
-// user.alice.score 500 6
-// user.alice.score 600 7
-
-// Merge two engines.
-const a = new QuiltTime();
-a.set('x', 1, { t: 1 });
-const b = new QuiltTime();
-b.set('y', 2, { t: 1 });
-const merged = QuiltTime.merge(a, b);
-merged.get('x');  // → 1
-merged.get('y');  // → 2
-
-// Save and load.
-const json = q.toJSON();
-const restored = QuiltTime.fromJSON(json);
-restored.get('user.alice.score');  // → 600
+// git branch.
+const v1 = q.fork('experiment');
+q.set('counter', 999); // diverged
+q.rewind(v1);          // back to 2
+q.get('counter');      // → 2
 ```
 
-## Test
+That's the whole API. `at`, `diff`, `fork`, `rewind`, `replay`, `merge`. Like git, but for cell data.
+
+---
+
+## 🎬 Time travel, visualized
+
+```
+   t=0         t=1         t=2         t=3         t=4
+   │           │           │           │           │
+   ▼           ▼           ▼           ▼           ▼
+   counter = 0 → counter = 1 → counter = 2 ─┬─ counter = 999
+                                            │
+                                       fork('experiment')
+                                            │
+                                            ▼
+                                       rewind
+                                            │
+                                            ▼
+                                       counter = 2  (back in time!)
+```
+
+Every `set` is a new version. Every cell has a history. The engine is undoable, branchable, replayable.
+
+---
+
+## 🎁 What you get
+
+- **at(t)** — the value of any cell at any past time
+- **diff(from, to)** — what changed between two times
+- **fork(label)** — snapshot the engine (like `git branch`)
+- **rewind(forkId)** — restore the engine to a fork
+- **replay(forkId)** — walk forward from a fork
+- **merge(other)** — combine two engines with deterministic conflict resolution
+- **JSON serialization** — save/load to disk
+- **~3 KB** minified, **0 dependencies**
+
+---
+
+## 🌊 The five operations, illustrated
+
+### `at(t)` — value at any past time
+```
+   value    100        150        200        250
+            │          │          │          │
+   t=0 ──── ● ──────● ──────● ──────● ──────● ─── now
+            │          │          │          │
+   at(1)  → 100        │          │          │
+   at(2)  →            150        │          │
+   at(3)  →                       200        │
+   at(4)  →                                  250  (current)
+```
+
+### `fork()` — like git branch
+```
+   main:        ●──●──●──●──●  (counter = 5)
+                  │
+                  └─ fork('experiment')
+                       ●──●  (counter = 99, diverged)
+```
+
+### `diff()` — what changed
+```
+   between t=2 and t=4:
+   counter: { from: 200, to: 250 }
+   flag:    { from: null, to: true }
+```
+
+### `replay()` — walk forward
+```
+   for (const e of q.replay('main')) {
+     console.log(e.cid, e.value, e.t);
+   }
+   // counter 250 4
+   // counter 999 5
+```
+
+### `merge()` — combine two engines
+```
+   alice:  { x: 1, t: 1 }
+   bob:    { y: 2, t: 1 }
+   merge → { x: 1, y: 2 }  (union of histories)
+```
+
+---
+
+## 🏗️ Architecture
+
+```
+   ┌──────────────────────────────────────────────────────────────┐
+   │                       QuiltTime                              │
+   │                                                              │
+   │   ┌──────────────┐  ┌──────────────┐  ┌──────────────────┐    │
+   │   │   CellHistory │  │   Forks      │  │   Lamport clock  │    │
+   │   │              │  │              │  │                  │    │
+   │   │   versions[] │  │   fork.id    │  │   clock = 5      │    │
+   │   │   subscribe  │─▶│   fork.t     │─▶│   tick()         │    │
+   │   │   at(t)      │  │   snapshot   │  │   observe()      │    │
+   │   │   diff()     │  │              │  │                  │    │
+   │   └──────────────┘  └──────────────┘  └──────────────────┘    │
+   │            │                  │                    │        │
+   │            └──────────────────┼────────────────────┘        │
+   │                               ▼                             │
+   │                      ┌──────────────────┐                    │
+   │                      │   JSON serialize │  save/load         │
+   │                      └──────────────────┘                    │
+   │                                                              │
+   └──────────────────────────────────────────────────────────────┘
+```
+
+Three structures, three responsibilities:
+- **CellHistory** — the version log per cell
+- **Forks** — named snapshots of the engine
+- **Lamport clock** — the causal ordering
+
+---
+
+## 💡 Use cases
+
+| Use case | What you build |
+| --- | --- |
+| **Undo without a stack** | A rewind is just `rewind(previousFork)`. No more undo stack bugs. |
+| **"What was my balance 6 months ago?"** | `at(sixMonthsAgo)` — the cell knows. |
+| **Branching scenarios** | "Try this budget. If it doesn't work, rewind." |
+| **Real-time collab** | Two peers, two engines, `merge()`. No server. |
+| **Audit log** | Every cell knows every change. Compliance is built in. |
+| **Time-travel debugging** | Replay the cell graph. See what the state was at each step. |
+
+---
+
+## 🛠️ Develop
 
 ```bash
+git clone https://github.com/SuperInstance/quilt-time
+cd quilt-time
+npm install
 npm test
 ```
 
-17 tests pass. Cover set/get, history, fork, rewind, replay, merge, serialization.
+17 tests, 0 failures. ~250 lines of code.
 
-## Use cases
+---
 
-- **Undo/redo without a stack.** A rewind is just `rewind(previousFork)`.
-- **"What was the value yesterday?"** — `at(t)`.
-- **"What changed between these two reports?"** — `diff(from, to)`.
-- **Branch a scenario, try something risky, return if it doesn't pan out.**
-- **Sync between devices using last-write-wins** — merge resolves
-  conflicts deterministically.
-- **Time-travel debugging.** Replay the cell history and see what
-  the state was at each step.
-- **Audit log.** Every change is preserved.
+## 📚 API reference
 
-## Design notes
+```typescript
+class QuiltTime {
+  // Set a cell value (monotonic timestamp).
+  set(id: string, value: any, opts?: { t?: number; author?: string }): QuiltTime;
 
-- **Timestamps are Lamport-like.** Each engine has a monotonic
-  counter. The `merge` function uses a tiebreaker tag (which fork
-  came "first") for deterministic conflict resolution.
-- **Storage is in-memory.** A real implementation would persist to
-  disk (append-only log, snapshot, then a real CRDT for merge).
-- **No CRDT yet.** The merge is "last-write-wins by time, with
-  tiebreaker." A real implementation would use Yjs, Automerge, or
-  a custom CRDT for true concurrent editing.
-- **The engine is small.** ~250 lines of code. No deps. Drop it
-  in.
+  // Get the current value of a cell.
+  get(id: string): any;
 
-## Why this matters
+  // Get the value of a cell at a specific time.
+  at(id: string, t: number): any;
 
-Databases give you persistence. Reactive systems give you live
-updates. CRDTs give you conflict-free merge. Spreadsheets give you
-formula propagation. **Quilt-time is the first system to give you
-all four in a single API surface, on a cell.**
+  // Get all versions of a cell.
+  history(id: string): Version[];
 
-This unlocks new applications:
+  // Diff two times. Returns per-cell change summary.
+  diff(from: number, to: number): { [cellId: string]: { from: any; to: any; changed: boolean } };
 
-- **Personal data with a real history.** Your budget cell can
-  answer "what was my net worth 6 months ago?"
-- **Branching models.** Try a different budget. If it doesn't work
-  out, rewind.
-- **Real-time collaboration without a server.** Two peers, two
-  engines, merge.
-- **Audit.** Every cell knows every change.
-- **Time-travel debugging for the entire app.** The whole cell
-  graph is replayable.
+  // Fork the engine. Returns fork id.
+  fork(label?: string): string;
 
-## Where it goes from here
+  // Rewind to a fork.
+  rewind(forkId: string): QuiltTime;
 
-This is the sketch. The next version:
+  // Replay events from a fork forward (generator).
+  *replay(forkId: string): Generator<{ cid: string; value: any; t: number; author: string }>;
 
-1. **Persist to disk.** Append-only log + periodic snapshot.
-2. **Real CRDT merge.** Use Yjs or Automerge.
-3. **Subscribe to history events.** Not just "cell changed" but
-   "cell changed from X to Y at time T."
-4. **Time-based queries.** `cells.changedBetween(t1, t2)`.
-5. **Compression.** Old versions can be garbage-collected or
-   compressed.
-6. **WASM port.** Time travel is universal — every cell engine
-   should have it.
+  // Merge two engines. Returns a new QuiltTime.
+  static merge(a: QuiltTime, b: QuiltTime): QuiltTime;
 
-## Related
+  // Serialize.
+  toJSON(): object;
 
-- [Quilt (TypeScript)](https://github.com/SuperInstance/quilt) — the
-  canonical reactive runtime.
-- [Quilt (Rust)](https://github.com/SuperInstance/quilt-rust) — the
-  desktop runtime.
-- [Quilt Live](https://github.com/SuperInstance/quilt-live) — the
-  single-file browser runtime.
-- [Quilt Mesh](https://github.com/SuperInstance/quilt-mesh) — peer-to-peer
-  cell sync (uses Lamport clocks; complement to time travel).
+  // Deserialize.
+  static fromJSON(json: object): QuiltTime;
+}
+```
+
+---
+
+## 🛣️ Roadmap
+
+1. **Persist to disk** — append-only log + periodic snapshot
+2. **Real CRDT merge** — use Yjs or Automerge for true concurrent editing
+3. **Subscribe to history events** — "cell changed from X to Y at time T"
+4. **Time-based queries** — `cells.changedBetween(t1, t2)`
+5. **Compression** — old versions can be garbage-collected or compressed
+6. **WASM port** — every cell engine should have time travel
+
+---
+
+## 🔗 Related
+
+- [Quilt (TypeScript)](https://github.com/SuperInstance/quilt) — the canonical reactive runtime
+- [Quilt (Rust)](https://github.com/SuperInstance/quilt-rust) — the desktop runtime
+- [Quilt Live](https://github.com/SuperInstance/quilt-live) — single-file browser runtime
+- [Quilt Mesh](https://github.com/SuperInstance/quilt-mesh) — peer-to-peer cell sync (uses Lamport clocks)
 - [Quilt 5-year roadmap](https://github.com/SuperInstance/quilt/blob/main/quilt-roadmap-2026.md)
-  — the bigger picture.
 
 ## License
 
